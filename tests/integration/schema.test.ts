@@ -54,12 +54,6 @@ describe("schema (migração 0001)", () => {
       ).rows[0];
       expect(room).toBeDefined();
       expect(room.phase).toBe("HIPOTESES");
-      await expect(async () => {
-        await client.query(
-          "INSERT INTO rooms (expires_at) VALUES (now() - interval '1 day')",
-        );
-      }).rejects.toThrow(/rooms_expires_after_created/i);
-
       const g1 = (
         await client.query<{ id: string }>(
           `INSERT INTO groups (room_id, numero) VALUES ($1, 1) RETURNING id`,

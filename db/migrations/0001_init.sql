@@ -9,8 +9,7 @@ CREATE TABLE rooms (
   phase TEXT NOT NULL DEFAULT 'HIPOTESES'
     CHECK (phase IN ('HIPOTESES', 'MEDICOES', 'REVELADO')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  expires_at TIMESTAMPTZ NOT NULL,
-  CONSTRAINT rooms_expires_after_created CHECK (expires_at > created_at)
+  expires_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE groups (

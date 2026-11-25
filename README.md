@@ -33,7 +33,8 @@ Variáveis de ambiente:
 
 | Nome | Formato | Uso |
 | --- | --- | --- |
-| `DATABASE_URL` | `postgresql://usuario:senha@host:porta/banco` | Conexão com o Postgres. Sem valor padrão; valores reais nunca ficam no repositório. |
+| `DATABASE_URL` | `postgresql://usuario:senha@host:porta/banco` | Conexão com o Postgres. Sem valor padrão; valores reais nunca ficam no repositório. Em produção (Neon), usar a connection string “pooled”. |
+| `NEXT_PUBLIC_APP_URL` | `https://dominio` (opcional) | URL base pública usada na montagem dos links de sala; se ausente, deriva da requisição. |
 
 ## Comandos
 
@@ -66,13 +67,21 @@ e são testados isoladamente em `tests/unit/`.
 
 - [x] **Etapa 1 — Preparação:** projeto mínimo, migrações do modelo completo,
       camada de domínio, testes unitários e integração provando persistência.
-- [ ] **Etapa 2 — Acesso e domínio:** criação de sala, links, troca por sessão,
-      projeção autorizada (próxima entrega).
+- [x] **Etapa 2 — Acesso e domínio:** criação de sala com links de uso único na
+      exibição (`POST /api/rooms`), troca de token do fragmento `#` por sessão
+      com cookie `HttpOnly`/`Secure`/`SameSite=Lax` (`POST /api/session`,
+      `GET /api/room` com matriz de acesso do PRD 4.2), tokens com 256 bits de
+      entropia armazenados somente como hash (SHA-256), expiração ligada à sala
+      (14 dias) e testes de isolamento entre papéis/salas.
 - [ ] **Etapas 3–6:** previsão e controle, medições e revelação, experiência,
       entrega da demo.
 
-A interface atual é apenas um landing placeholder; o fluxo do produto ainda não
-está implementado.
+Etapa 2 implementa: tela inicial com criação de sala (links exibidos uma única
+vez, com aviso de perda), página `/entrar` que troca o token por sessão e remove
+o fragmento da URL, painel do professor e do grupo (fase, situação, previsões;
+registro de hipótese e medições chegam nas etapas 3–4). O rate limit atual é em
+memória por instância (melhor esforço, não distribuído — PRD 11); o limite real
+por IP será configurado na infraestrutura (Neon/Vercel).
 
 ## Avisos
 
