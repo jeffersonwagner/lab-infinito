@@ -80,5 +80,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     room: { phase: projection.room.phase, expiresAt: projection.room.expiresAt },
     group: projection.group,
     revealed: projection.revealed,
+    // Só é não-nulo após REVELADO (PRD 4.2: nenhum dado alheio antes dela).
+    resultados: projection.resultados,
   });
 }

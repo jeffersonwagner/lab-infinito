@@ -80,14 +80,23 @@ e são testados isoladamente em `tests/unit/`.
       (`POST /api/room/advance`, recálculo de ausentes/pendentes sob bloqueio,
       confirmação da lista exata com divergência → 409, `AUSENTE` definido
       apenas na saída de `HIPOTESES`, sem pular/voltar fases).
-- [ ] **Etapas 4–6:** medições e revelação, experiência, entrega da demo.
+- [x] **Etapa 4 — Medições e revelação:** envio atômico de seis tempos
+      (`POST /api/measurements/submit`, medições + submissão na mesma
+      transação com `SELECT ... FOR UPDATE`, retry igual idempotente mesmo
+      após a revelação, conjunto diferente → 409, grupo ausente não envia),
+      cálculo no servidor (média, período, amplitude, razão com precisão
+      integral — arredondamento a 2 casas só na apresentação) e revelação
+      comparada: participante pendente aparece como SEM_MEDICAO (sem zero
+      fictício); antes da revelação nenhum dado alheio sai da API.
+- [ ] **Etapas 5–6:** experiência, entrega da demo.
 
-Etapa 3 implementa: formulário de previsão no painel do grupo (opções do PRD,
-justificativa de até 200 caracteres, avisos de imutabilidade e de não inserir
-dados pessoais) e controle de fases no painel do professor com confirmação
-de ausentes/pendentes. O rate limit atual é em memória por instância (melhor
-esforço, não distribuído — PRD 11); o limite real por IP será configurado na
-infraestrutura (Neon/Vercel).
+Etapas 3–4 implementam: formulário de previsão no painel do grupo (opções do
+PRD, justificativa de até 200 caracteres, avisos de imutabilidade e de não
+inserir dados pessoais), formulário de seis tempos (vírgula ou ponto), controle
+de fases no painel do professor com confirmação de ausentes/pendentes e
+tabela comparativa de resultados após a revelação. O rate limit atual é em
+memória por instância (melhor esforço, não distribuído — PRD 11); o limite
+real por IP será configurado na infraestrutura (Neon/Vercel).
 
 ## Avisos
 

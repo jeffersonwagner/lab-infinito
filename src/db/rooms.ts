@@ -1,5 +1,6 @@
 import { getPool } from "./client";
 import { generateLinkToken, generateSessionId } from "@/lib/tokens";
+import { computeGroupStats, type GroupStats } from "@/domain/calc";
 
 export const ROOM_TTL_DAYS = 14;
 export const SESSION_COOKIE = "__Host-lab_session";
@@ -189,11 +190,18 @@ export async function insertSession(args: {
   }
 }
 
+export type TemposPorComprimento = { 50: number[]; 100: number[] };
+
 export type GroupProjection = {
   numero: number;
   status: string;
   hypothesis: { opcao: string; justificativa: string | null } | null;
   measurementsConfirmed: boolean;
+  // Tempos e estatísticas só são preenchidos quando autorizado: dados próprios
+  // do grupo ou visão pós-REVELADO (PRD 4.2). Participante pendente fica com
+  // tempos/stats nulos — aparece como SEM_MEDICAO, nunca como zero.
+  tempos: TemposPorComprimento | null;
+  stats: GroupStats | null;
 };
 
 export type RoomBase = {
@@ -214,15 +222,25 @@ export async function getRoomBase(roomId: string): Promise<RoomBase | null> {
   return { phase: row.phase, expiresAt: row.expires_at };
 }
 
-export async function getProfessorProjection(roomId: string): Promise<{
-  room: RoomBase;
-  groups: GroupProjection[];
-} | null> {
-  const room = await getRoomBase(roomId);
-  if (!room) {
-    return null;
-  }
-  const rows = (
+type GroupRow = {
+  numero: number;
+  status: string;
+  opcao: string | null;
+  justificativa: string | null;
+  measurements_confirmed: boolean;
+};
+
+function statsDe(tempos: TemposPorComprimento): GroupStats {
+  return computeGroupStats({ times: tempos[50] }, { times: tempos[100] });
+}
+
+// Carrega os grupos da sala. Tempos/estatísticas só entram na projeção quando
+// includeMeasurements (dados próprios do grupo ou fase REVELADO).
+async function loadGroups(
+  roomId: string,
+  includeMeasurements: boolean,
+): Promise<GroupProjection[]> {
+  const rows: GroupRow[] = (
     await getPool().query(
       `SELECT g.numero, g.status,
               h.opcao, h.justificativa,
@@ -235,19 +253,55 @@ export async function getProfessorProjection(roomId: string): Promise<{
       [roomId],
     )
   ).rows;
-  return {
-    room,
-    groups: rows.map((r) => ({
+
+  let temposPorGrupo = new Map<number, TemposPorComprimento>();
+  if (includeMeasurements && rows.length > 0) {
+    const medidaRows = (
+      await getPool().query(
+        `SELECT g.numero AS numero, m.comprimento_cm, m.repeticao, m.segundos
+         FROM measurements m JOIN groups g ON g.id = m.group_id
+         WHERE g.room_id = $1 ORDER BY g.numero, m.comprimento_cm, m.repeticao`,
+        [roomId],
+      )
+    ).rows as { numero: number; comprimento_cm: number; repeticao: number; segundos: string }[];
+    for (const row of medidaRows) {
+      const atual = temposPorGrupo.get(row.numero) ?? { 50: [0, 0, 0], 100: [0, 0, 0] };
+      atual[row.comprimento_cm as 50 | 100][row.repeticao - 1] = parseFloat(row.segundos);
+      temposPorGrupo.set(row.numero, atual);
+    }
+  }
+
+  return rows.map((r) => {
+    // Só expõe tempos quando há submissão confirmada (grupo participante);
+    // pendente permanece sem medição, sem zero fictício (PRD 4.1/8.1).
+    const tempos = r.measurements_confirmed ? (temposPorGrupo.get(r.numero) ?? null) : null;
+    return {
       numero: r.numero,
       status: r.status,
       hypothesis: r.opcao ? { opcao: r.opcao, justificativa: r.justificativa } : null,
       measurementsConfirmed: r.measurements_confirmed,
-    })),
-  };
+      tempos,
+      stats: tempos ? statsDe(tempos) : null,
+    };
+  });
 }
 
-// PRD 4.2: na fase HIPOTESES o grupo vê apenas o próprio estado; dados dos
-// demais somente após REVELADO (comparação completa chega na etapa 4).
+export async function getProfessorProjection(roomId: string): Promise<{
+  room: RoomBase;
+  groups: GroupProjection[];
+} | null> {
+  const room = await getRoomBase(roomId);
+  if (!room) {
+    return null;
+  }
+  // PRD 4.2: antes da revelação o professor vê hipóteses e progresso de
+  // envio; detalhes das medições apenas em REVELADO.
+  const groups = await loadGroups(roomId, room.phase === "REVELADO");
+  return { room, groups };
+}
+
+// PRD 4.2: antes da revelação o grupo vê apenas o próprio estado (com os
+// próprios tempos/estatísticas); dados dos demais somente após REVELADO.
 export async function getGroupProjection(
   roomId: string,
   groupNumero: number,
@@ -255,35 +309,24 @@ export async function getGroupProjection(
   room: RoomBase;
   group: GroupProjection;
   revealed: boolean;
+  resultados: GroupProjection[] | null;
 } | null> {
   const room = await getRoomBase(roomId);
   if (!room) {
     return null;
   }
-  const row = (
-    await getPool().query(
-      `SELECT g.numero, g.status,
-              h.opcao, h.justificativa,
-              (sub.group_id IS NOT NULL) AS measurements_confirmed
-       FROM groups g
-       LEFT JOIN hypotheses h ON h.group_id = g.id
-       LEFT JOIN submissions sub ON sub.group_id = g.id
-       WHERE g.room_id = $1 AND g.numero = $2`,
-      [roomId, groupNumero],
-    )
-  ).rows[0];
-  if (!row) {
+  const revealed = room.phase === "REVELADO";
+  const own = (await loadGroups(roomId, true)).find((g) => g.numero === groupNumero);
+  if (!own) {
     return null;
   }
   return {
     room,
-    group: {
-      numero: row.numero,
-      status: row.status,
-      hypothesis: row.opcao ? { opcao: row.opcao, justificativa: row.justificativa } : null,
-      measurementsConfirmed: row.measurements_confirmed,
-    },
-    revealed: room.phase === "REVELADO",
+    group: own,
+    revealed,
+    // PRD 4.1: após a revelação, grupos autorizados consultam os resultados
+    // dos participantes; antes disso, nenhum dado alheio sai daqui.
+    resultados: revealed ? await loadGroups(roomId, true) : null,
   };
 }
 

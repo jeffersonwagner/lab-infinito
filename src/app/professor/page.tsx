@@ -7,16 +7,12 @@ import {
   STATUS_LABELS,
   loadIdentity,
 } from "@/lib/identity";
+import ResultadosRevelados, { type GrupoResultado } from "@/components/ResultadosRevelados";
 
 type Projection = {
   role: "PROFESSOR";
   room: { phase: string; expiresAt: string };
-  groups: {
-    numero: number;
-    status: string;
-    hypothesis: { opcao: string; justificativa: string | null } | null;
-    measurementsConfirmed: boolean;
-  }[];
+  groups: GrupoResultado[];
 };
 
 export default function Professor() {
@@ -169,6 +165,9 @@ export default function Professor() {
                     : `Confirmar avanço${pendentes.length > 0 ? ` (ausentes/pendentes: ${pendentes.join(", ")})` : ""}`}
               </button>
             </section>
+          )}
+          {data.room.phase === "REVELADO" && (
+            <ResultadosRevelados grupos={data.groups} mostrarDiscussao={false} />
           )}
           <button type="button" onClick={carregar}>
             Atualizar
