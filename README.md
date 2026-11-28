@@ -49,6 +49,12 @@ npm run test:integration  # schema/persistência (Postgres embarcado, descartáv
 npm run migrate           # aplica migrações pendentes em DATABASE_URL
 ```
 
+## Deploy
+
+O guia completo de publicação (Neon + Vercel, variáveis, verificação
+funcional e de segurança, roteiro para a demo) está em
+[`docs/DEPLOY.md`](docs/DEPLOY.md). Execute somente com autorização de Jeff.
+
 ## Modelo de dados
 
 `db/migrations/0001_init.sql` cria: `rooms` (fase enumerada `HIPOTESES → MEDICOES →
