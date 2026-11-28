@@ -73,15 +73,21 @@ e são testados isoladamente em `tests/unit/`.
       `GET /api/room` com matriz de acesso do PRD 4.2), tokens com 256 bits de
       entropia armazenados somente como hash (SHA-256), expiração ligada à sala
       (14 dias) e testes de isolamento entre papéis/salas.
-- [ ] **Etapas 3–6:** previsão e controle, medições e revelação, experiência,
-      entrega da demo.
+- [x] **Etapa 3 — Previsão e controle:** confirmação de hipótese única e
+      imutável (`POST /api/hypothesis`, transação com `SELECT ... FOR UPDATE`
+      na sala, retry igual idempotente mesmo após mudança de fase, conteúdo
+      diferente → 409) e avanço de fase somente do professor
+      (`POST /api/room/advance`, recálculo de ausentes/pendentes sob bloqueio,
+      confirmação da lista exata com divergência → 409, `AUSENTE` definido
+      apenas na saída de `HIPOTESES`, sem pular/voltar fases).
+- [ ] **Etapas 4–6:** medições e revelação, experiência, entrega da demo.
 
-Etapa 2 implementa: tela inicial com criação de sala (links exibidos uma única
-vez, com aviso de perda), página `/entrar` que troca o token por sessão e remove
-o fragmento da URL, painel do professor e do grupo (fase, situação, previsões;
-registro de hipótese e medições chegam nas etapas 3–4). O rate limit atual é em
-memória por instância (melhor esforço, não distribuído — PRD 11); o limite real
-por IP será configurado na infraestrutura (Neon/Vercel).
+Etapa 3 implementa: formulário de previsão no painel do grupo (opções do PRD,
+justificativa de até 200 caracteres, avisos de imutabilidade e de não inserir
+dados pessoais) e controle de fases no painel do professor com confirmação
+de ausentes/pendentes. O rate limit atual é em memória por instância (melhor
+esforço, não distribuído — PRD 11); o limite real por IP será configurado na
+infraestrutura (Neon/Vercel).
 
 ## Avisos
 
