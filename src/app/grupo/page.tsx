@@ -8,6 +8,7 @@ import {
   loadIdentity,
 } from "@/lib/identity";
 import ResultadosRevelados, { type GrupoResultado } from "@/components/ResultadosRevelados";
+import { usePolling } from "@/lib/usePolling";
 
 type Projection = {
   role: "GRUPO";
@@ -40,6 +41,7 @@ export default function Grupo() {
   });
   const [enviandoMedicoes, setEnviandoMedicoes] = useState(false);
   const [erroMedicoes, setErroMedicoes] = useState<string | null>(null);
+  const [sessaoInvalida, setSessaoInvalida] = useState(false);
 
   const carregar = useCallback(async () => {
     const identity = loadIdentity();
@@ -57,6 +59,11 @@ export default function Grupo() {
       const res = await fetch(`/api/room?${params}`);
       const body = await res.json();
       if (!res.ok) {
+        // PRD 8.2: 401/409 indicam sessão expirada ou divergente (ex.: outro
+        // link trocou o cookie neste perfil). Para o polling e pede reabrir.
+        if (res.status === 401 || res.status === 409) {
+          setSessaoInvalida(true);
+        }
         setError(body.error ?? "Falha ao carregar a sala.");
       } else {
         setError(null);
@@ -73,6 +80,9 @@ export default function Grupo() {
     carregar();
   }, [carregar]);
 
+  // RF-09: polling 5 s com aba visível; pausado quando a sessão é inválida.
+  usePolling(carregar, 5000, !sessaoInvalida);
+
   return (
     <main>
       <h1>Sala do grupo</h1>
@@ -86,6 +96,14 @@ export default function Grupo() {
       {error && (
         <p role="alert" className="erro">
           {error}
+        </p>
+      )}
+      {sessaoInvalida && (
+        <p role="alert" className="erro">
+          A sessão desta aba não corresponde mais à identidade esperada (pode
+          ter expirado ou outro link foi aberto neste navegador). Feche esta
+          aba e reabra o link correto da sala.{" "}
+          <a href="/entrar">Ir para a tela de acesso</a>
         </p>
       )}
       {data && (

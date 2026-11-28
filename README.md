@@ -35,6 +35,7 @@ Variáveis de ambiente:
 | --- | --- | --- |
 | `DATABASE_URL` | `postgresql://usuario:senha@host:porta/banco` | Conexão com o Postgres. Sem valor padrão; valores reais nunca ficam no repositório. Em produção (Neon), usar a connection string “pooled”. |
 | `NEXT_PUBLIC_APP_URL` | `https://dominio` (opcional) | URL base pública usada na montagem dos links de sala; se ausente, deriva da requisição. |
+| `CLEANUP_SECRET` | string aleatória (obrigatória em produção) | Protege `GET/POST /api/cron/cleanup` (`Authorization: Bearer …`). Sem essa variável a rotina fica desabilitada (503) e nada é removido. |
 
 ## Comandos
 
@@ -88,15 +89,24 @@ e são testados isoladamente em `tests/unit/`.
       integral — arredondamento a 2 casas só na apresentação) e revelação
       comparada: participante pendente aparece como SEM_MEDICAO (sem zero
       fictício); antes da revelação nenhum dado alheio sai da API.
-- [ ] **Etapas 5–6:** experiência, entrega da demo.
+- [x] **Etapa 5 — Experiência e estabilidade:** polling a cada 5 s enquanto a
+      aba está visível e ao voltar à aba (pausado quando oculta), sem apagar
+      entradas ainda não enviadas; proteção contra troca de sessão entre abas
+      (401/409 param o polling e a tela pede reabrir o link correto);
+      limpeza autenticada de salas expiradas (`/api/cron/cleanup` com
+      `CLEANUP_SECRET`, agendada no `vercel.json` — diária às 03:00 UTC,
+      ajustável conforme o plano da Vercel); testes negativos de sala
+      expirada em escrita.
+- [ ] **Etapa 6:** entrega da demo (somente com autorização de Jeff).
 
-Etapas 3–4 implementam: formulário de previsão no painel do grupo (opções do
+Etapas 3–5 implementam: formulário de previsão no painel do grupo (opções do
 PRD, justificativa de até 200 caracteres, avisos de imutabilidade e de não
 inserir dados pessoais), formulário de seis tempos (vírgula ou ponto), controle
-de fases no painel do professor com confirmação de ausentes/pendentes e
-tabela comparativa de resultados após a revelação. O rate limit atual é em
-memória por instância (melhor esforço, não distribuído — PRD 11); o limite
-real por IP será configurado na infraestrutura (Neon/Vercel).
+de fases no painel do professor com confirmação de ausentes/pendentes,
+tabela comparativa de resultados após a revelação e atualização automática.
+O rate limit atual é em memória por instância (melhor esforço, não
+distribuído — PRD 11); o limite real por IP será configurado na
+infraestrutura (Neon/Vercel).
 
 ## Avisos
 

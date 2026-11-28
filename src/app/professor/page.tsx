@@ -8,6 +8,7 @@ import {
   loadIdentity,
 } from "@/lib/identity";
 import ResultadosRevelados, { type GrupoResultado } from "@/components/ResultadosRevelados";
+import { usePolling } from "@/lib/usePolling";
 
 type Projection = {
   role: "PROFESSOR";
@@ -23,6 +24,7 @@ export default function Professor() {
   const [avancando, setAvancando] = useState(false);
   const [erroAvanco, setErroAvanco] = useState<string | null>(null);
   const [pendentes, setPendentes] = useState<number[] | null>(null);
+  const [sessaoInvalida, setSessaoInvalida] = useState(false);
 
   const carregar = useCallback(async () => {
     const identity = loadIdentity();
@@ -40,6 +42,10 @@ export default function Professor() {
       const res = await fetch(`/api/room?${params}`);
       const body = await res.json();
       if (!res.ok) {
+        // PRD 8.2: 401/409 → sessão expirada ou trocada; para o polling.
+        if (res.status === 401 || res.status === 409) {
+          setSessaoInvalida(true);
+        }
         setError(body.error ?? "Falha ao carregar a sala.");
       } else {
         setError(null);
@@ -56,6 +62,9 @@ export default function Professor() {
     carregar();
   }, [carregar]);
 
+  // RF-09: polling 5 s com aba visível; pausado quando a sessão é inválida.
+  usePolling(carregar, 5000, !sessaoInvalida);
+
   return (
     <main>
       <h1>Sala do professor</h1>
@@ -67,6 +76,14 @@ export default function Professor() {
       {error && (
         <p role="alert" className="erro">
           {error}
+        </p>
+      )}
+      {sessaoInvalida && (
+        <p role="alert" className="erro">
+          A sessão desta aba não corresponde mais à identidade esperada (pode
+          ter expirado ou outro link foi aberto neste navegador). Feche esta
+          aba e reabra o link correto da sala.{" "}
+          <a href="/entrar">Ir para a tela de acesso</a>
         </p>
       )}
       {data && (
